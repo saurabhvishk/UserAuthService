@@ -1,6 +1,9 @@
 package com.example.userauthservice.models;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,5 +11,7 @@ import lombok.Setter;
 @Setter
 @Entity
 public class Role extends BaseModel{
-    private String value;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, unique = true)
+    private RoleType value;
 }

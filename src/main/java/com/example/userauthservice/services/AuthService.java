@@ -1,81 +1,128 @@
 package com.example.userauthservice.services;
 
+import com.example.userauthservice.dtos.LoginResult;
 import com.example.userauthservice.exception.InvalidCredentialsException;
-import com.example.userauthservice.exception.UserAlreadyExixtsException;
-import com.example.userauthservice.models.State;
-import com.example.userauthservice.models.User;
+import com.example.userauthservice.exception.InvalidTokenException;
+import com.example.userauthservice.exception.UserAlreadyExistsException;
+import com.example.userauthservice.models.*;
+import com.example.userauthservice.repos.RoleRepo;
+import com.example.userauthservice.repos.SessionRepo;
 import com.example.userauthservice.repos.UserRepo;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.MacAlgorithm;
-import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class AuthService implements IAuthService{
-
     @Autowired
     private UserRepo userRepo;
 
     @Autowired
+    private RoleRepo roleRepo;
+
+    @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
+    @Autowired
+    private SessionRepo sessionRepo;
+
+    @Autowired
+    private SecretKey secretKey;
+
+    private static final long TOKEN_VALIDITY_MS = 24 * 60 * 60 * 1000L; // 24 hours
+
     @Override
-    public User signup(String email, String password) throws UserAlreadyExixtsException {
+    public User signup(String email, String password) throws UserAlreadyExistsException {
         Optional<User> userOptional = userRepo.findUserByEmail(email);
         if(userOptional.isPresent()) {
-            throw new UserAlreadyExixtsException("User already exists");
+            throw new UserAlreadyExistsException("User already exists");
         }
         User user = new User();
         user.setEmail(email);
         user.setState(State.ACTIVE);
         user.setPassword(bCryptPasswordEncoder.encode(password));
+        user.getRoles().add(getOrCreateRole(RoleType.USER));
         userRepo.save(user);
         return user;
     }
 
     @Override
-    public Pair<User, MultiValueMap<String, String>> login(String email, String password) throws InvalidCredentialsException {
-        Optional<User> userOptional = userRepo.findUserByEmail(email);
-        if(userOptional.isPresent()) {
-            User user = userOptional.get();
-            if(!bCryptPasswordEncoder.matches(password, user.getPassword())) {
-                throw new InvalidCredentialsException("Invalid credentials");
-            }
+    public LoginResult login(String email, String password) throws InvalidCredentialsException {
+        User user = userRepo.findUserByEmail(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid credentials"));
 
-            Map<String, Object> claims = new HashMap<>();
-            claims.put("id", user.getId());
-            claims.put("email", user.getEmail());
-            claims.put("roles", user.getRoles());
-
-            long timeInMillis = System.currentTimeMillis();
-
-            claims.put("iat", timeInMillis);
-            claims.put("exp", timeInMillis + 1000 * 60 * 60 * 24); // 1 day expiration
-            claims.put("iss", "userauthservice");
-            MacAlgorithm algorithm = Jwts.SIG.HS256;
-            SecretKey secretKey = algorithm.key().build();
-
-            String token = Jwts.builder().claims(claims).signWith(secretKey).compact();
-            MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-            headers.add(HttpHeaders.SET_COOKIE, token);
-            return new Pair<>(user, headers);
+        if (!bCryptPasswordEncoder.matches(password, user.getPassword())) {
+            throw new InvalidCredentialsException("Invalid credentials");
         }
-        return null;
+        if (user.getState() != State.ACTIVE) {
+            throw new InvalidCredentialsException("Account is not active");
+        }
+
+        String token = createToken(user);
+
+        Session session = new Session();
+        session.setToken(token);
+        session.setUser(user);
+        session.setState(State.ACTIVE);
+        sessionRepo.save(session);
+
+        return new LoginResult(user, token);
     }
 
     @Override
-    public User logout(String email) {
-        return null;
+    public void logout(String token, Long userId) throws InvalidTokenException {
+        Session session = sessionRepo.findByTokenAndUserId(token, userId)
+                .orElseThrow(() -> new InvalidTokenException("Session not found"));
+        session.setState(State.INACTIVE);
+        sessionRepo.save(session);
+    }
+
+
+    @Override
+    public Boolean validateToken(String token, Long userId) {
+        Optional<Session> sessionOptional = sessionRepo.findByTokenAndUserId(token, userId);
+        if(sessionOptional.isEmpty() || sessionOptional.get().getState() != State.ACTIVE) {
+            return false;
+        }
+        try{
+            Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String createToken(User user) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + TOKEN_VALIDITY_MS);
+
+        List<RoleType> roleNames = user.getRoles().stream()
+                .map(Role::getValue)
+                .toList();
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(String.valueOf(user.getId()))
+                .claim("email", user.getEmail())
+                .claim("roles", roleNames)
+                .issuer("userAuthService")
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(secretKey)
+                .compact();
+    }
+
+
+    private Role getOrCreateRole(RoleType value) {
+        return roleRepo.findByValue(value).orElseGet(() -> {
+            Role role = new Role();
+            role.setValue(value);
+            role.setState(State.ACTIVE);
+            return roleRepo.save(role);
+        });
     }
 }

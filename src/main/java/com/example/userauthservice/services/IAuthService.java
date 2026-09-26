@@ -1,13 +1,14 @@
 package com.example.userauthservice.services;
 
+import com.example.userauthservice.dtos.LoginResult;
 import com.example.userauthservice.exception.InvalidCredentialsException;
-import com.example.userauthservice.exception.UserAlreadyExixtsException;
+import com.example.userauthservice.exception.InvalidTokenException;
+import com.example.userauthservice.exception.UserAlreadyExistsException;
 import com.example.userauthservice.models.User;
-import org.antlr.v4.runtime.misc.Pair;
-import org.springframework.util.MultiValueMap;
 
 public interface IAuthService {
-    User signup(String email, String password) throws UserAlreadyExixtsException;
-    Pair<User, MultiValueMap<String, String>> login(String email, String password) throws InvalidCredentialsException;
-    User logout(String email);
+    User signup(String email, String password) throws UserAlreadyExistsException;
+    LoginResult login(String email, String password) throws InvalidCredentialsException;
+    void logout(String token, Long userId) throws InvalidTokenException;
+    Boolean validateToken(String token,Long userId);
 }

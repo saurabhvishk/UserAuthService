@@ -1,6 +1,6 @@
 package com.example.userauthservice.dtos;
 
-import com.example.userauthservice.models.Role;
+import com.example.userauthservice.models.RoleType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,8 +11,10 @@ import java.util.Set;
 @Setter
 public class UserDto {
 
+    private Long id;
+
     private String email;
 
-    private Set<Role> roles = new HashSet<>();
+    private Set<RoleType> roles = new HashSet<>();
 
 }

@@ -1,6 +1,8 @@
 package com.example.userauthservice.models;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToMany;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,9 +14,12 @@ import java.util.Set;
 @Setter
 @Entity
 public class User extends BaseModel{
+
+    @Column(unique = true,nullable = false)
     private String email;
+
     private String password;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     private Set<Role> roles = new HashSet<>();
 }
