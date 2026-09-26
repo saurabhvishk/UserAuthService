@@ -4,7 +4,6 @@ import com.example.userauthservice.dtos.*;
 import com.example.userauthservice.exception.InvalidCredentialsException;
 import com.example.userauthservice.exception.InvalidTokenException;
 import com.example.userauthservice.exception.UserAlreadyExistsException;
-import com.example.userauthservice.models.Role;
 import com.example.userauthservice.models.User;
 import com.example.userauthservice.services.IAuthService;
 import jakarta.validation.Valid;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/auth")
@@ -31,7 +29,7 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<UserDto> signup(@Valid @RequestBody SignupRequestDto signupRequestDto) throws UserAlreadyExistsException {
         User user = authService.signup(signupRequestDto.getEmail(),signupRequestDto.getPassword());
-        return new ResponseEntity<>(from(user), HttpStatus.CREATED);
+        return new ResponseEntity<>(UserDto.from(user), HttpStatus.CREATED);
 
     }
 
@@ -47,7 +45,7 @@ public class AuthController {
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(from(result.user()));
+                .body(UserDto.from(result.user()));
     }
 
     @PostMapping("/logout")
@@ -69,13 +67,4 @@ public class AuthController {
         return new ResponseEntity<>(isValid, isValid ? HttpStatus.OK : HttpStatus.UNAUTHORIZED);
     }
 
-    private UserDto from(User user){
-        UserDto userDto = new UserDto();
-        userDto.setId(user.getId());
-        userDto.setEmail(user.getEmail());
-        userDto.setRoles(user.getRoles().stream()
-                .map(Role::getValue)
-                .collect(Collectors.toSet()));
-        return userDto;
-    }
 }

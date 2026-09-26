@@ -20,6 +20,10 @@ public class User extends BaseModel{
 
     private String password;
 
+    private String name;
+
+    private String phone;
+
     @ManyToMany(fetch = FetchType.EAGER)
     private Set<Role> roles = new HashSet<>();
 }

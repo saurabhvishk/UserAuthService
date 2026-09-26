@@ -4,6 +4,7 @@ import com.example.userauthservice.dtos.ErrorResponse;
 import com.example.userauthservice.exception.InvalidCredentialsException;
 import com.example.userauthservice.exception.InvalidTokenException;
 import com.example.userauthservice.exception.UserAlreadyExistsException;
+import com.example.userauthservice.exception.UserNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,5 +44,10 @@ public class ControllerAdvisor {
                 .collect(Collectors.joining(", "));
         return new ResponseEntity<>(new ErrorResponse(message), HttpStatus.BAD_REQUEST);
     }
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException e) {
+        return new ResponseEntity<>(new ErrorResponse(e.getMessage()), HttpStatus.NOT_FOUND);
+    }
+
 }
 
